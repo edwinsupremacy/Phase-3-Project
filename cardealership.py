@@ -1,26 +1,60 @@
 import sqlite3
-import datetime
 
+def create_tables():
+    connection = sqlite3.connect("cars.db")
+    cursor = connection.cursor()
+
+    cursor.execute('DROP TABLE IF EXISTS cars')
+    cursor.execute('''CREATE TABLE IF NOT EXISTS cars(
+                   car_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                   brand_name TEXT NOT NULL,
+                   car_model TEXT NOT NULL,
+                   year_of_production TEXT NOT NULL,
+                   chassis_code TEXT NOT NULL
+    )''')
+
+    cursor.execute('''CREATE TABLE IF NOT EXISTS brands(
+                   id INTEGER PRIMARY KEY AUTOINCREMENT,
+                   brand_name TEXT NOT NULL
+    )''')
+
+    cursor.execute('''CREATE TABLE IF NOT EXISTS maintenance(
+                   maintenance_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                   maintenance_date TEXT NOT NULL,
+                   cost TEXT NOT NULL,
+                   car_id INTEGER,
+                   FOREIGN KEY (car_id) REFERENCES cars(car_id)
+    )''')
+
+    connection.commit()
+    connection.close()
+
+create_tables()
 
 class CarDealership:
     def __init__(self):
         self.connection = sqlite3.connect("cars.db")
         self.cursor = self.connection.cursor()
 
-    def adding_cars(self, brand_name, car_model, year_of_production):
+    def adding_cars(self, brand_name, car_model, year_of_production, chassis_code):
         self.cursor.execute('INSERT OR IGNORE INTO brands (brand_name) VALUES (?)', (brand_name,))
         self.connection.commit()
-        self.cursor.execute('INSERT INTO cars(brand_name,car_model,year_of_production) VALUES(?,?,?)',
-                            (brand_name, car_model, year_of_production))
+        self.cursor.execute('INSERT INTO cars(brand_name, car_model, year_of_production, chassis_code) VALUES(?,?,?,?)',
+                            (brand_name, car_model, year_of_production, chassis_code))
         self.connection.commit()
 
     def list_cars(self):
         query = '''
-            SELECT cars.car_id,cars.brand_name,cars.car_model,cars.year_of_production,
-            COALESCE(maintenance.maintenance_date, 'No maintenance') AS last_maintenance_date
+            SELECT 
+                cars.car_id, 
+                cars.brand_name, 
+                cars.car_model, 
+                cars.year_of_production, 
+                cars.chassis_code,
+                COALESCE(maintenance.maintenance_date, 'No maintenance') AS last_maintenance_date
             FROM cars
             LEFT JOIN maintenance ON cars.car_id = maintenance.car_id
-             '''
+        '''
         self.cursor.execute(query)
         return self.cursor.fetchall()
 
@@ -49,30 +83,9 @@ class CarDealership:
     def close(self):
         self.connection.close()
 
-
-class CarDealershipUser:
+class CarDealershipUI:
     def __init__(self, dealership):
         self.dealership = dealership
-        self._brand_name = None
-        self._car_model = None
-        self._maintenance_date = None
-
-    @property
-    def brand_name(self):
-        return self._brand_name
-
-    @brand_name.setter
-    def brand_name(self, value):
-        self._brand_name = value.capitalize() if value else None
-
-    @property
-    def car_model(self):
-        return self._car_model
-
-    @car_model.setter
-    def car_model(self, value):
-        self._car_model = value.capitalize() if value else None
-
 
     def run(self):
         while True:
@@ -96,28 +109,29 @@ class CarDealershipUser:
             elif choice == '5':
                 self.delete_car()
             elif choice == '6':
-                print(" Goodbye...")
+                print("Goodbye...")
                 break
             else:
                 print("Invalid choice. Please try again.")
 
     def add_car(self):
-        self.brand_name = input("Enter brand name: ")
-        self.car_model = input("Enter car model: ")
+        brand_name = input("Enter brand name: ")
+        car_model = input("Enter car model: ")
         year_of_production = input("Enter year of production: ")
-        self.dealership.adding_cars(self.brand_name, self.car_model, year_of_production)
+        chassis_code = input("Enter chassis code: ")
+        self.dealership.adding_cars(brand_name, car_model, year_of_production, chassis_code)
+
+    def add_maintenance(self):
+        car_id = input("Enter car ID: ")
+        maintenance_date = input("Enter maintenance date (YYYY-MM-DD): ")
+        cost = input("Enter maintenance cost: ")
+        self.dealership.add_maintenance(car_id, maintenance_date, cost)
 
     def list_cars(self):
         cars = self.dealership.list_cars()
         print("\nCars in the database:")
         for car in cars:
             print(car)
-
-    def add_maintenance(self):
-        car_id = input("Enter car ID: ")
-        self.maintenance_date = input("Enter maintenance date (YYYY-MM-DD): ")
-        cost = input("Enter maintenance cost: ")
-        self.dealership.add_maintenance(car_id, self.maintenance_date, cost)
 
     def list_brands(self):
         print("\nBrands in the database:")
@@ -131,13 +145,11 @@ class CarDealershipUser:
     def close(self):
         self.dealership.close()
 
-
 def main():
     dealership = CarDealership()
-    app = CarDealershipUser(dealership)
-    app.run()
-    app.close()
-
+    ui = CarDealershipUI(dealership)
+    ui.run()
+    ui.close()
 
 if __name__ == "__main__":
     main()
