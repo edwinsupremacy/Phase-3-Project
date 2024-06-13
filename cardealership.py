@@ -45,18 +45,14 @@ class CarDealership:
 
     def list_cars(self):
         query = '''
-            SELECT 
-                cars.car_id, 
-                cars.brand_name, 
-                cars.car_model, 
-                cars.year_of_production, 
-                cars.chassis_code,
-                COALESCE(maintenance.maintenance_date, 'No maintenance') AS last_maintenance_date
+            SELECT cars.car_id, cars.brand_name, cars.car_model, cars.year_of_production, cars.chassis_code,
+            COALESCE(maintenance.maintenance_date, 'No maintenance') AS last_maintenance_date
             FROM cars
             LEFT JOIN maintenance ON cars.car_id = maintenance.car_id
-        '''
+            '''
         self.cursor.execute(query)
         return self.cursor.fetchall()
+        
 
     def add_maintenance(self, car_id, maintenance_date, cost):
         self.cursor.execute('SELECT car_id FROM cars WHERE car_id = ?', (car_id,))
@@ -77,15 +73,64 @@ class CarDealership:
             print(brand[0])
 
     def delete_car(self, car_id):
-        self.cursor.execute('DELETE FROM cars WHERE car_id = ?', (car_id,))
+         
+        self.cursor.execute('SELECT brand_name FROM cars WHERE car_id=?', (car_id))
+        deleted_brand=self.cursor.fetchone()
+
+        if deleted_brand:
+            brand_name=deleted_brand[0]
+
+            self.cursor.execute('DELETE FROM cars WHERE car_id=?', (car_id))
+            self.connection.commit()
+
+            self.cursor.execute('SELECT COUNT(*) FROM cars WHERE brand_name = ?', (brand_name,))
+            brand_count = self.cursor.fetchone()[0]
+
+            if brand_count==0:
+                self.cursor.execute('DELETE FROM brands WHERE brand_name=?',(brand_name,))
+                self.connection.commit()
+            print('car deleted succesfully')
+        else:
+            print('car not found')
+
+        
+    def clear_all_cars(self):
+        self.cursor.execute('DELETE FROM maintenance')
+        self.cursor.execute('DELETE FROM cars')
+        self.cursor.execute('DELETE FROM brands')
         self.connection.commit()
+        print("Allrecords clear.")
 
     def close(self):
         self.connection.close()
+def main():
+    dealership = CarDealership()
+    user = CarDealershipUser(dealership)
+    user.run()
+    user.close()
 
-class CarDealershipUI:
+class CarDealershipUser:
     def __init__(self, dealership):
         self.dealership = dealership
+        self._brand_name = ''
+        self._car_model = ''
+        
+    @property
+    def brand_name(self):
+        return self._brand_name
+
+    @brand_name.setter
+    def brand_name(self, value):
+        self._brand_name = value.capitalize()
+
+    @property
+    def car_model(self):
+        return self._car_model
+
+    @car_model.setter
+    def car_model(self, value):
+        self._car_model = value.capitalize()
+
 
     def run(self):
         while True:
@@ -94,7 +139,8 @@ class CarDealershipUI:
             print("3. List Cars")
             print("4. List Brands")
             print("5. Delete Car")
-            print("6. Exit")
+            print("6. Clear All Car Records")
+            print("7. Exit")
 
             choice = input("Enter choice: ")
 
@@ -109,6 +155,8 @@ class CarDealershipUI:
             elif choice == '5':
                 self.delete_car()
             elif choice == '6':
+                self.clear_all_cars()
+            elif choice == '7':
                 print("Goodbye...")
                 break
             else:
@@ -142,14 +190,17 @@ class CarDealershipUI:
         self.dealership.delete_car(car_id)
         print(f"Car with ID {car_id} deleted successfully.")
 
+    def clear_all_cars(self):
+        confirm = input("Are you sure you want to clear all car records? (yes/no): ")
+        if confirm.lower() == 'yes':
+            self.dealership.clear_all_cars()
+        else:
+            print("Clear all cars operation cancelled.")
+
     def close(self):
         self.dealership.close()
 
-def main():
-    dealership = CarDealership()
-    ui = CarDealershipUI(dealership)
-    ui.run()
-    ui.close()
+
 
 if __name__ == "__main__":
     main()
