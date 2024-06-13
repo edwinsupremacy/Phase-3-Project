@@ -37,10 +37,10 @@ class CarDealership:
         self.cursor = self.connection.cursor()
 
     def adding_cars(self, brand_name, car_model, year_of_production, chassis_code):
-        self.cursor.execute('INSERT OR IGNORE INTO brands (brand_name) VALUES (?)', (brand_name,))
+        self.cursor.execute('INSERT OR IGNORE INTO brands (brand_name) VALUES (?)', (brand_name.strip(),))
         self.connection.commit()
         self.cursor.execute('INSERT INTO cars(brand_name, car_model, year_of_production, chassis_code) VALUES(?,?,?,?)',
-                            (brand_name, car_model, year_of_production, chassis_code))
+                            (brand_name.strip(), car_model, year_of_production, chassis_code))
         self.connection.commit()
 
     def list_cars(self):
@@ -52,7 +52,17 @@ class CarDealership:
             '''
         self.cursor.execute(query)
         return self.cursor.fetchall()
-        
+
+    def search_cars(self, search_term, search_by):
+        query = f'''
+            SELECT cars.car_id, cars.brand_name, cars.car_model, cars.year_of_production, cars.chassis_code,
+            COALESCE(maintenance.maintenance_date, 'No maintenance') AS last_maintenance_date
+            FROM cars
+            LEFT JOIN maintenance ON cars.car_id = maintenance.car_id
+            WHERE {search_by} LIKE ?
+            '''
+        self.cursor.execute(query, ('%' + search_term + '%',))
+        return self.cursor.fetchall()
 
     def add_maintenance(self, car_id, maintenance_date, cost):
         self.cursor.execute('SELECT car_id FROM cars WHERE car_id = ?', (car_id,))
@@ -73,36 +83,35 @@ class CarDealership:
             print(brand[0])
 
     def delete_car(self, car_id):
-         
-        self.cursor.execute('SELECT brand_name FROM cars WHERE car_id=?', (car_id))
-        deleted_brand=self.cursor.fetchone()
+        self.cursor.execute('SELECT brand_name FROM cars WHERE car_id=?', (car_id,))
+        deleted_brand = self.cursor.fetchone()
 
         if deleted_brand:
-            brand_name=deleted_brand[0]
+            brand_name = deleted_brand[0]
 
-            self.cursor.execute('DELETE FROM cars WHERE car_id=?', (car_id))
+            self.cursor.execute('DELETE FROM cars WHERE car_id=?', (car_id,))
             self.connection.commit()
 
             self.cursor.execute('SELECT COUNT(*) FROM cars WHERE brand_name = ?', (brand_name,))
             brand_count = self.cursor.fetchone()[0]
 
-            if brand_count==0:
-                self.cursor.execute('DELETE FROM brands WHERE brand_name=?',(brand_name,))
+            if brand_count == 0:
+                self.cursor.execute('DELETE FROM brands WHERE brand_name=?', (brand_name,))
                 self.connection.commit()
-            print('car deleted succesfully')
+            print('Car deleted successfully')
         else:
-            print('car not found')
+            print('Car not found')
 
-        
     def clear_all_cars(self):
         self.cursor.execute('DELETE FROM maintenance')
         self.cursor.execute('DELETE FROM cars')
         self.cursor.execute('DELETE FROM brands')
         self.connection.commit()
-        print("Allrecords clear.")
+        print("All records cleared.")
 
     def close(self):
         self.connection.close()
+
 def main():
     dealership = CarDealership()
     user = CarDealershipUser(dealership)
@@ -114,7 +123,7 @@ class CarDealershipUser:
         self.dealership = dealership
         self._brand_name = ''
         self._car_model = ''
-        
+
     @property
     def brand_name(self):
         return self._brand_name
@@ -131,7 +140,6 @@ class CarDealershipUser:
     def car_model(self, value):
         self._car_model = value.capitalize()
 
-
     def run(self):
         while True:
             print("\n1. Add Car")
@@ -139,8 +147,9 @@ class CarDealershipUser:
             print("3. List Cars")
             print("4. List Brands")
             print("5. Delete Car")
-            print("6. Clear All Car Records")
-            print("7. Exit")
+            print("6. Search Cars ")
+            print("7. Clear All Car Records")
+            print("8. Exit")
 
             choice = input("Enter choice: ")
 
@@ -155,12 +164,14 @@ class CarDealershipUser:
             elif choice == '5':
                 self.delete_car()
             elif choice == '6':
-                self.clear_all_cars()
+                self.search_cars()
             elif choice == '7':
-                print("Goodbye...")
+                self.clear_all_cars()
+            elif choice == '8':
+                print("ADIOS.((`-`))...")
                 break
             else:
-                print("Invalid choice. Please try again.")
+                print("Invalid choice.")
 
     def add_car(self):
         brand_name = input("Enter brand name: ")
@@ -168,39 +179,71 @@ class CarDealershipUser:
         year_of_production = input("Enter year of production: ")
         chassis_code = input("Enter chassis code: ")
         self.dealership.adding_cars(brand_name, car_model, year_of_production, chassis_code)
+        print('Car added successfully')
 
     def add_maintenance(self):
         car_id = input("Enter car ID: ")
         maintenance_date = input("Enter maintenance date (YYYY-MM-DD): ")
         cost = input("Enter maintenance cost: ")
         self.dealership.add_maintenance(car_id, maintenance_date, cost)
+        print('Maintenance added successfully')
 
     def list_cars(self):
         cars = self.dealership.list_cars()
         print("\nCars in the database:")
         for car in cars:
-            print(car)
+            print(f"{car[0]}. {car[1]} {car[2]}, Production:{car[3]}, Chassis:({car[4]}), MaintenanceDate:{car[5]}")
 
     def list_brands(self):
-        print("\nBrands in the database:")
+        print("\nBrands available in the database:")
         self.dealership.list_brands()
 
     def delete_car(self):
-        car_id = input("Enter car ID to delete: ")
+        car_id = input("Enter car ID to delete: ").strip()
+        if not car_id.isdigit():
+            print("Enter a numeric car ID.")
+            return
         self.dealership.delete_car(car_id)
-        print(f"Car with ID {car_id} deleted successfully.")
+        print(f"Car deleted successfully.")
 
     def clear_all_cars(self):
         confirm = input("Are you sure you want to clear all car records? (yes/no): ")
         if confirm.lower() == 'yes':
             self.dealership.clear_all_cars()
         else:
-            print("Clear all cars operation cancelled.")
+            print("Operation cancelled.")
+
+    def search_cars(self):
+        print("\nSearch cars by:")
+        print("1. Brand")
+        print("2. Model")
+        print("3. Year of Production")
+        
+        choice = input("Enter choice: ")
+
+        if choice == '1':
+            search_term = input("Enter brand name to search: ").strip()
+            search_by = "brand_name"
+        elif choice == '2':
+            search_term = input("Enter car model to search: ").strip()
+            search_by = "car_model"
+        elif choice == '3':
+            search_term = input("Enter year of production to search: ").strip()
+            search_by = "year_of_production"
+        else:
+            print("Invalid choice.")
+            return
+        
+        cars = self.dealership.search_cars(search_term, search_by)
+        if cars:
+            print("\nResults:")
+            for car in cars:
+                print(f"{car[0]}, Brand:{car[1]}, Model:{car[2]}, Production:{car[3]}, Chassis:({car[4]}), MaintenanceDate:{car[5]}")
+        else:
+            print("No cars found.")
 
     def close(self):
         self.dealership.close()
-
-
 
 if __name__ == "__main__":
     main()
