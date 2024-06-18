@@ -1,38 +1,5 @@
+
 import sqlite3
-from database.models import Car, Brand, Maintenance
-
-def create_tables():
-    connection = sqlite3.connect("cars.db")
-    cursor = connection.cursor()
-
-    cursor.execute('DROP TABLE IF EXISTS cars')
-    cursor.execute('''CREATE TABLE IF NOT EXISTS cars(
-                   car_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                   brand_name TEXT NOT NULL,
-                   car_model TEXT NOT NULL,
-                   year_of_production TEXT NOT NULL,
-                   chassis_code TEXT NOT NULL
-    )''')
-
-    cursor.execute('''CREATE TABLE IF NOT EXISTS brands(
-                   id INTEGER PRIMARY KEY AUTOINCREMENT,
-                   brand_name TEXT NOT NULL
-    )''')
-
-    cursor.execute('''CREATE TABLE IF NOT EXISTS maintenance(
-                   maintenance_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                   maintenance_date TEXT NOT NULL,
-                   cost TEXT NOT NULL,
-                   car_id INTEGER,
-                   FOREIGN KEY (car_id) REFERENCES cars(car_id)
-    )''')
-
-    connection.commit()
-    connection.close()
-
-if __name__ == "__main__":
-    create_tables()
-
 
 class CarDealership:
     def __init__(self):
@@ -54,11 +21,7 @@ class CarDealership:
             LEFT JOIN maintenance ON cars.car_id = maintenance.car_id
             '''
         self.cursor.execute(query)
-        cars = []
-        for row in self.cursor.fetchall():
-            car = Car(*row)
-            cars.append(car)
-        return cars
+        return self.cursor.fetchall()
 
     def search_cars(self, search_term, search_by):
         query = f'''
@@ -69,11 +32,7 @@ class CarDealership:
             WHERE {search_by} LIKE ?
             '''
         self.cursor.execute(query, ('%' + search_term + '%',))
-        cars = []
-        for row in self.cursor.fetchall():
-            car = Car(*row)
-            cars.append(car)
-        return cars
+        return self.cursor.fetchall()
 
     def add_maintenance(self, car_id, maintenance_date, cost):
         self.cursor.execute('SELECT car_id FROM cars WHERE car_id = ?', (car_id,))
@@ -89,11 +48,8 @@ class CarDealership:
 
     def list_brands(self):
         self.cursor.execute('SELECT DISTINCT brand_name FROM brands')
-        brands = []
-        for row in self.cursor.fetchall():
-            brand = Brand(*row)
-            brands.append(brand)
-        return brands
+        brands = self.cursor.fetchall()
+        return [brand[0] for brand in brands]
 
     def delete_car(self, car_id):
         self.cursor.execute('SELECT brand_name FROM cars WHERE car_id=?', (car_id,))
@@ -124,4 +80,3 @@ class CarDealership:
 
     def close(self):
         self.connection.close()
-

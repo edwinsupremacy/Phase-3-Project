@@ -1,5 +1,5 @@
-from database import CarDealership
-from user_interface import CarDealershipUser
+from models import CarDealership
+from user import CarDealershipUser
 
 def main():
     dealership = CarDealership()
