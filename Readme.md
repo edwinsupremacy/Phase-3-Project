@@ -4,7 +4,8 @@ Date, 2024/04/12
 Edwin Mwangi
 
 ##Description
-It is a CLI programme where Car Dealership managers can input their cars data on the programme for easy management.The system has the following features:
+It is a CLI programme where Car Dealership managers can input their cars data on the programme for easy and simple management.
+The system has the following features:
 -Allows the managers to add cars to their database.
 -Managers can list all cars.
 -Managers can search their cars by Brand,Year of production and Make.
